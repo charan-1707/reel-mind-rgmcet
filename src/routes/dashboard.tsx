@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -10,8 +10,17 @@ import {
   YAxis,
 } from "recharts";
 import { RotateCcw } from "lucide-react";
-import { REELS, TAG_LABEL } from "@/lib/reels";
-import { hydrate, reset, scoreReels, topInterests, useEngine } from "@/lib/engine";
+import { TAG_LABEL } from "@/lib/reels";
+import { useFeed } from "@/lib/feed-store";
+import {
+  ACTION_LABEL,
+  computeInterests,
+  interestTimeline,
+  rankReels,
+  recFeedbackMap,
+  seenReelIds,
+  topInterests,
+} from "@/lib/scoring";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -27,35 +36,49 @@ export const Route = createFileRoute("/dashboard")({
         property: "og:description",
         content: "Interest evolution, recommendation history, and feedback in one view.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Dashboard,
 });
 
-const ACTION_LABEL: Record<string, string> = {
-  watched: "Watched to the end",
-  liked: "Liked",
-  skipped: "Skipped",
-  rec_up: "Marked useful",
-  rec_down: "Marked not relevant",
-};
-
 function Dashboard() {
-  const state = useEngine();
-  useEffect(() => hydrate(), []);
+  const { reels, interactions, queue, loading, isGuest, resetProfile } = useFeed();
 
-  const top = topInterests(state, 4);
+  const interests = useMemo(
+    () => computeInterests(interactions, reels),
+    [interactions, reels],
+  );
+  const top = useMemo(() => topInterests(interests, 4), [interests]);
+
   const series = useMemo(() => {
-    return state.snapshots.map((s, i) => {
+    const timeline = interestTimeline(interactions, reels);
+    return timeline.map((snapshot, i) => {
       const row: Record<string, number | string> = { step: i + 1 };
       top.forEach(([tag]) => {
-        row[tag] = Number((s.interests[tag] ?? 0).toFixed(2));
+        row[tag] = Number((snapshot[tag] ?? 0).toFixed(2));
       });
       return row;
     });
-  }, [state.snapshots, top]);
+  }, [interactions, reels, top]);
 
-  const ranked = scoreReels(state).slice(0, 6);
+  const ranked = useMemo(
+    () => rankReels({ reels, interactions }).slice(0, 6),
+    [reels, interactions],
+  );
+
+  const history = useMemo(
+    () => [...interactions].sort((a, b) => b.at - a.at).slice(0, 12),
+    [interactions],
+  );
+
+  const seenCount = useMemo(() => seenReelIds(interactions).length, [interactions]);
+  const ratedCount = useMemo(
+    () => Object.keys(recFeedbackMap(interactions)).length,
+    [interactions],
+  );
+
   const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
 
   return (
@@ -66,10 +89,11 @@ function Dashboard() {
             <h1 className="text-3xl font-semibold">Your interest graph</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Every watch, like, skip and rating reshapes the ranking. Here is the trail.
+              {isGuest ? " Signed out — this profile is stored on this device." : ""}
             </p>
           </div>
           <button
-            onClick={reset}
+            onClick={resetProfile}
             className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <RotateCcw className="size-3.5" /> Reset profile
@@ -78,10 +102,10 @@ function Dashboard() {
 
         <section className="grid gap-4 sm:grid-cols-4">
           {[
-            ["Reels watched", state.seen.length],
-            ["Signals sent", state.events.length],
-            ["Rated recs", Object.keys(state.recFeedback).length],
-            ["Queued", state.queue.length],
+            ["Reels watched", seenCount],
+            ["Signals sent", interactions.length],
+            ["Rated recs", ratedCount],
+            ["Queued", queue.length],
           ].map(([label, value]) => (
             <div key={String(label)} className="rounded-xl border border-border bg-card p-5">
               <p className="label">{label}</p>
@@ -93,10 +117,14 @@ function Dashboard() {
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-lg font-semibold">Interest evolution</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Weight per topic across your last {series.length || 0} interactions.
+            Weight per topic across your last {series.length} interactions.
           </p>
           <div className="mt-6 h-72">
-            {series.length < 2 ? (
+            {loading ? (
+              <div className="grid h-full place-items-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                Loading your profile…
+              </div>
+            ) : series.length < 2 ? (
               <div className="grid h-full place-items-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
                 Watch a couple of reels to plot your curve.
               </div>
@@ -140,10 +168,7 @@ function Dashboard() {
           <div className="mt-4 flex flex-wrap gap-4">
             {top.map(([tag], i) => (
               <span key={tag} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span
-                  className="size-2.5 rounded-full"
-                  style={{ background: colors[i] }}
-                />
+                <span className="size-2.5 rounded-full" style={{ background: colors[i] }} />
                 {TAG_LABEL[tag] ?? tag}
               </span>
             ))}
@@ -154,11 +179,11 @@ function Dashboard() {
           <div className="rounded-xl border border-border bg-card p-5">
             <h2 className="text-lg font-semibold">Recommendation history</h2>
             <ul className="mt-4 divide-y divide-border">
-              {state.events.length === 0 && (
+              {history.length === 0 && (
                 <li className="py-3 text-sm text-muted-foreground">Nothing yet.</li>
               )}
-              {state.events.slice(0, 12).map((e) => {
-                const r = REELS.find((x) => x.id === e.reelId);
+              {history.map((e) => {
+                const r = reels.find((x) => x.id === e.reelId);
                 return (
                   <li key={e.id} className="flex items-baseline gap-3 py-3">
                     <span
@@ -170,7 +195,9 @@ function Dashboard() {
                     >
                       {ACTION_LABEL[e.action]}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm">{r?.title}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {r?.title ?? "Unknown reel"}
+                    </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {new Date(e.at).toLocaleTimeString([], {
                         hour: "2-digit",
