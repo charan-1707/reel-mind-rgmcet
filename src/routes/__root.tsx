@@ -12,6 +12,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { FeedProvider } from "@/lib/feed-store";
 
 function NotFoundComponent() {
   return (
@@ -118,6 +120,33 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function AuthNav() {
+  const { user, displayName, signOut } = useAuth();
+
+  if (!user) {
+    return (
+      <Link
+        to="/auth"
+        className="ml-1 rounded-full bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+      >
+        Sign in
+      </Link>
+    );
+  }
+
+  return (
+    <span className="ml-1 flex items-center gap-2">
+      <span className="hidden text-xs text-muted-foreground sm:inline">{displayName}</span>
+      <button
+        onClick={() => void signOut()}
+        className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        Sign out
+      </button>
+    </span>
+  );
+}
+
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
@@ -136,12 +165,20 @@ function SiteHeader() {
             Feed
           </Link>
           <Link
+            to="/explore"
+            className="rounded-full px-3.5 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            activeProps={{ className: "bg-surface-2 text-foreground" }}
+          >
+            Explore
+          </Link>
+          <Link
             to="/dashboard"
             className="rounded-full px-3.5 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
             activeProps={{ className: "bg-surface-2 text-foreground" }}
           >
             Dashboard
           </Link>
+          <AuthNav />
         </nav>
       </div>
     </header>
@@ -153,10 +190,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SiteHeader />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster position="bottom-center" />
+      <AuthProvider>
+        <FeedProvider>
+          <SiteHeader />
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+          <Toaster position="bottom-center" />
+        </FeedProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
