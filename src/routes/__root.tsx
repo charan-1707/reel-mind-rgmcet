@@ -138,12 +138,20 @@ function SiteHeader() {
             Feed
           </Link>
           <Link
+            to="/explore"
+            className="rounded-full px-3.5 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            activeProps={{ className: "bg-surface-2 text-foreground" }}
+          >
+            Explore
+          </Link>
+          <Link
             to="/dashboard"
             className="rounded-full px-3.5 py-1.5 text-muted-foreground transition-colors hover:text-foreground"
             activeProps={{ className: "bg-surface-2 text-foreground" }}
           >
             Dashboard
           </Link>
+          <AuthNav />
         </nav>
       </div>
     </header>
