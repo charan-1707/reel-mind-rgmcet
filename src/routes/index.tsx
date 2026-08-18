@@ -16,9 +16,8 @@ import { Poster } from "@/components/Poster";
 import { ReelPlayer } from "@/components/ReelPlayer";
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    reel: typeof search["reel"] === "string" ? (search["reel"] as string) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { reel?: string } =>
+    typeof search["reel"] === "string" ? { reel: search["reel"] } : {},
   head: () => ({
     meta: [
       { title: "Reelmind — AI tech reels that learn what you watch" },
