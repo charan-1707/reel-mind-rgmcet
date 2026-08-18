@@ -50,7 +50,8 @@ export function ReelPlayer({
   return (
     <div className="relative aspect-[9/14] w-full overflow-hidden rounded-xl border border-border bg-card sm:aspect-[9/13]">
       <Poster reel={reel} className="absolute inset-0" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,transparent_35%,oklch(0.16_0.014_165/0.55))]" />
 
       <div className="absolute inset-x-0 top-0 flex items-center gap-3 p-4">
         <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-foreground/20">
