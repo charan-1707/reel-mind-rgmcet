@@ -120,6 +120,33 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function AuthNav() {
+  const { user, displayName, signOut } = useAuth();
+
+  if (!user) {
+    return (
+      <Link
+        to="/auth"
+        className="ml-1 rounded-full bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+      >
+        Sign in
+      </Link>
+    );
+  }
+
+  return (
+    <span className="ml-1 flex items-center gap-2">
+      <span className="hidden text-xs text-muted-foreground sm:inline">{displayName}</span>
+      <button
+        onClick={() => void signOut()}
+        className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        Sign out
+      </button>
+    </span>
+  );
+}
+
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
